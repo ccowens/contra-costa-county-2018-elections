@@ -12,6 +12,7 @@ ends <- grep("Totals:", result_lines)
 
 # parse the beginning lines for contest names and how many picks for each contest
 info_lines <- result_lines[begins] 
+# NOTE: matrix forces the splits into the right configuration so each 2-col row is from the same text line
 split_lines <- matrix(unlist(str_split(info_lines, "\\(Vote For ")), ncol=2, byrow=TRUE)
 Contest <- str_trim(split_lines[,1],side="both")
 Select <- str_sub(split_lines[,2],-2,1)
@@ -25,7 +26,7 @@ for (i in 1:length(all_contests[,1])) {
   print(i) #echo
   # save out the text lines for the contest and read in as a fixed width file 
   writeLines(result_lines[(begins[i]+1):(ends[i]-1)], "temp.txt")
-  columns <- nchar(readLines("temp.txt")[3])/30 #columns are eaually 30 wide
+  columns <- nchar(readLines("temp.txt")[3])/30 #columns are 30 wide
   contest <- read.fwf("temp.txt", rep.int(30, columns))
   # make everything character
   contest[] <- lapply(contest, as.character)
