@@ -34,3 +34,7 @@ vignettes/*.pdf
 
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
+.Rproj.user
+*.zip
+temp.txt
+Contra Costa - Election Night Reporting - 2018-12-12.png
