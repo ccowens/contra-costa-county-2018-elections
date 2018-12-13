@@ -1,6 +1,9 @@
 if(!require(stringr)) {install.packages("stringr"); library(stringr)} #str_split str_trim str_sub
 if(!require(readr)) {install.packages("readr"); library(readr)} #write_csv
 
+# create folder for output files if needed
+dir.create("contests")
+
 # get, open, and read in the file with results as text
 download.file("https://results.enr.clarityelections.com/CA/Contra_Costa/92672/224337/reports/detailtxt.zip", "detailtxt.zip")
 unzip("detailtxt.zip")
@@ -19,7 +22,7 @@ Select <- str_sub(split_lines[,2],-2,1)
 
 # create a numeric filename to reference the contest and write it to a CSV file with the other contest info
 all_contests <- data.frame(Filename = paste0(1:length(info_lines),".csv"), Contest = Contest, Select = Select)
-write_csv(all_contests,"index-of-contests.csv")
+write_csv(all_contests,"contests/index-of-contests.csv")
 
 # loop through and parse each set of lines for each contest 
 for (i in 1:length(all_contests[,1])) {
@@ -46,5 +49,5 @@ for (i in 1:length(all_contests[,1])) {
   contest <- cbind(Precinct = str_trim(rownames(contest), side = "both"), contest)
   rownames(contest) <- NULL
   # write everything out
-  write_csv(contest, paste0(i,".csv"))
+  write_csv(contest, paste0("contests/",i,".csv"))
 }
