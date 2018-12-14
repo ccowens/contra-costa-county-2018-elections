@@ -7,7 +7,7 @@ dir.create("contests")
 # get, open, and read in the file with results as text
 download.file("https://results.enr.clarityelections.com/CA/Contra_Costa/92672/224337/reports/detailtxt.zip", "detailtxt.zip")
 unzip("detailtxt.zip")
-result_lines <- readLines("detail.txt")
+result_lines <- iconv(readLines("detail.txt"), "UTF-8") #read in as UTF-8 for diacritical in names
 
 # mark the beginnings and ends of the lines for the contests 
 begins <- grep("Vote For", result_lines)
