@@ -2,10 +2,11 @@
 title: "Extracting Contest Data from Official Election Results"
 author: "Charles Cowens"
 output:
-  html_document:
-    df_print: paged
+  word_document: default
   html_notebook: default
   pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 
@@ -17,7 +18,7 @@ This script grabs the election results FWF (Fixed Width Format) file and tries t
 
 ## Packages  
 
-The script uses two extra packages:
+The script uses three extra packages:
 
 * **stringr** adds these functions: `str_split()`, `str_trim()`, `str_sub()`  
 * **readr** adds `write_csv()`  
@@ -68,21 +69,21 @@ The beginning lines for contest sections look like this:
 result_lines[753]
 ```
 
-It includes the name of the race and how many seats or options are available in the race. Extract this info by splitting on the "(Vote For " phrase. 
+It includes the name of the race and how many selections are available (seats open) in the race. Extract this info by splitting on the "(Vote For " phrase. 
 
-_Note:_ `unlist(strsplit())` makes a single vector in which the contest name and number of open seats alternate. Snaking this into a two-column matrix makes it easy to select the names and seats as columns and place them into separate corresponding vectors after trimming.
+_Note:_ `unlist(strsplit())` makes a single vector in which the contest name and number of selections to be made alternate. Snaking this into a two-column matrix makes it easy to select the names and selections as columns and place them into separate corresponding vectors after trimming.
 
 ```{r contest names and open seats}
 info_lines <- result_lines[begins] 
 split_lines <- matrix(unlist(str_split(info_lines, "\\(Vote For ")), ncol=2, byrow=TRUE)
 contest_names <- str_trim(split_lines[,1],side="both")
-open_seats <- str_sub(split_lines[,2],-2,1)
+selections <- str_sub(split_lines[,2],-2,1)
 ```
 
-To get the number of candidates, we take advantage of the fact that we know the columns are a fixed width of 30 characters. We measure length of the third line from the beginning (the first with number results that fill out the whole column with spaces). After dividing by 30 we drop the precinct, registered voters, and total count columns (3) and then divide by 2 to eliminate the extra columns for each candidate in the count. 
+To get the number of choices (candidates), we take advantage of the fact that we know the columns are a fixed width of 30 characters. We measure length of the third line from the beginning (the first with number results that fill out the whole column with spaces). After dividing by 30 we drop the precinct, registered voters, and total count columns (3) and then divide by 2 to eliminate the extra columns for each choice (candidate) in the count. 
 
 ```{r candidates running}
-candidates_numbers_of <- unlist(lapply(begins, function(x) {
+choices <- unlist(lapply(begins, function(x) {
   ((str_length(result_lines[x + 3])/30)-3)/2
 }))
 ```
@@ -95,8 +96,8 @@ filenames <- paste0(seq_along(info_lines),".csv")
 
 Combine all the columnns together and save out the index file.
 
-```{r }
-all_contests <- data.frame(Contest = contest_names, Filename = filenames, Open.Seats = open_seats, Candidates = candidates_numbers_of) %>% arrange(Contest)
+```{r tie together and write out index}
+all_contests <- data.frame(Contest = contest_names, Filename = filenames, Selections = selections, Choices = choices) %>% arrange(Contest)
 write_csv(all_contests,"contests/index-of-contests.csv")
 ```
 
@@ -108,11 +109,11 @@ write_csv(all_contests,"contests/index-of-contests.csv")
 * The candidate tallies have seprate columns for the election day votes that're the same as the complete candidate totals for some reason. Use `seq()` to drop these duplicated columns and the last (overall total) column.
 * Drop the top two rows.
 * Temporarily stow away the cleaned-up precinct names by making them row names and dropping the precinct column. 
-* Make everything remaining as data a number, using `contest[] <- lapply()`
+* Make everything remaining as data into a number, using `contest[] <- lapply()`
 * Add the Precinct column back in and throw out the row names
 * Write everything out
 
-```{r}
+```{r loop through to generate contest files}
 for (i in 1:length(all_contests[,1])) {
   writeLines(result_lines[(begins[i]+1):(ends[i]-1)], "temp.txt")
   columns <- nchar(readLines("temp.txt")[3])/30 #columns are 30 wide
