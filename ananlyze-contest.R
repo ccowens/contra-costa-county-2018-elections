@@ -34,3 +34,9 @@ best_city <- unlist(lapply(candidates, function(x) {
 }))
 
 best_city_by_candidate <- data.frame(`Best Result` = best_result, `City` = best_city, stringsAsFactors = FALSE)
+
+top_result <- apply(wccusd[-1], 1, max)
+
+top_in_city <- unlist(lapply(wccusd$City, function(x) {
+  wccusd[match(best_result[x], pull(select(wccusd,x))), 1]
+}))
