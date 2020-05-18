@@ -1,0 +1,136 @@
+---
+title: "Extracting Contest Data from Official Election Results"
+author: "Charles Cowens"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r knitr-setup, include=FALSE}
+knitr::opts_chunk$set(results='hide', warning=F, message=F)
+```
+
+This script grabs the election results FWF (Fixed Width Format) file and tries to break it up into more useful CSVs with an overall index CSV.  
+
+## Packages  
+
+The script uses three extra packages:
+
+* **stringr** adds these functions: `str_split()`, `str_trim()`, `str_sub()`  
+* **readr** adds `write_csv()`  
+* **dplyr** adds `arrange()`
+
+```{r packages}
+if(!require(stringr)) {install.packages("stringr"); library(stringr)} 
+if(!require(readr)) {install.packages("readr"); library(readr)} 
+if(!require(dplyr)) {install.packages("dplyr"); library(dplyr)} 
+```
+
+## Setting Up
+
+Download and unzip the results file if not done already. Then, read the lines into `result_lines` after filtering it through `iconv()` as UTF-8 to keep the diactricals in candidate names intact. 
+
+```{r download}
+if (!file.exists("detail.txt")) {
+  download.file("https://results.enr.clarityelections.com/CA/Contra_Costa/92672/224337/reports/detailtxt.zip", "detailtxt.zip")
+  unzip("detailtxt.zip")
+  }
+result_lines <- iconv(readLines("detail.txt"), "UTF-8")
+```
+
+Here's an example of some lines from the file:
+
+```{r input example, results='markup'}
+result_lines[750:760]
+```
+
+Make sure there's a folder for output files.
+
+```{r directory}
+if (!dir.exists("contests")) dir.create("contests")
+```
+
+## Create the Index to Individual Content Files
+
+Mark the beginnings and ends of the lines for the individual contests.
+
+```{r mark postions}
+begins <- grep("Vote For", result_lines)
+ends <- grep("Totals:", result_lines)
+```
+
+The beginning lines for contest sections look like this:
+
+```{r example beginning line,  results='markup'}
+result_lines[753]
+```
+
+It includes the name of the race and how many selections are available (seats open) in the race. Extract this info by splitting on the "(Vote For " phrase. 
+
+_Note:_ `unlist(strsplit())` makes a single vector in which the contest name and number of selections to be made alternate. Snaking this into a two-column matrix makes it easy to select the names and selections as columns and place them into separate corresponding vectors after trimming.
+
+```{r contest names and open seats}
+info_lines <- result_lines[begins] 
+split_lines <- matrix(unlist(str_split(info_lines, "\\(Vote For ")), ncol=2, byrow=TRUE)
+contest_names <- str_trim(split_lines[,1],side="both")
+selections <- str_sub(split_lines[,2],-2,1)
+```
+
+To get the number of choices (candidates), we take advantage of the fact that we know the columns are a fixed width of 30 characters. We measure length of the third line from the beginning (the first with number results that fill out the whole column with spaces). After dividing by 30 we drop the precinct, registered voters, and total count columns (3) and then divide by 2 to eliminate the extra columns for each choice (candidate) in the count. 
+
+```{r candidates running}
+choices <- unlist(lapply(begins, function(x) {
+  ((str_length(result_lines[x + 3])/30)-3)/2
+}))
+```
+
+The final calculation for the index of contests is the names of the contest CSV files. Instead of using something munged from the contest name, for simplicity, I just use a numeric sequence.
+
+```{r generate filenames}
+filenames <- paste0(seq_along(info_lines),".csv")
+```
+
+Combine all the columnns together and save out the index file.
+
+```{r tie together and write out index}
+all_contests <- data.frame(Contest = contest_names, Filename = filenames, Selections = selections, Choices = choices) %>% arrange(Contest)
+write_csv(all_contests,"contests/index-of-contests.csv")
+```
+
+## Making the Individual Contest Election Files
+
+* Loop through and pull out sets of lines for contests saving out the text lines for each contest to a temp file and reading the file back in as a fixed width file.
+* Make everything in the read-in data frame a character type (instead of a factor) using `contest[] <- lapply()`.
+* Clean the candidate names and pull them up as column names.
+* The candidate tallies have seprate columns for the election day votes that're the same as the complete candidate totals for some reason. Use `seq()` to drop these duplicated columns and the last (overall total) column.
+* Drop the top two rows.
+* Temporarily stow away the cleaned-up precinct names by making them row names and dropping the precinct column. 
+* Make everything remaining as data into a number, using `contest[] <- lapply()`
+* Add the Precinct column back in and throw out the row names
+* Write everything out
+
+```{r loop through to generate contest files}
+for (i in 1:length(all_contests[,1])) {
+  writeLines(result_lines[(begins[i]+1):(ends[i]-1)], "temp.txt")
+  columns <- nchar(readLines("temp.txt")[3])/30 #columns are 30 wide
+  contest <- read.fwf("temp.txt", rep.int(30, columns))
+  
+  contest[] <- lapply(contest, as.character)
+  colnames(contest) <- str_trim(c(contest[1,]), side = "both")
+  contest <- contest[,c(seq(1, columns-1, 2))]
+  contest <- contest[-c(1,2),]
+  
+  rownames(contest) <- str_trim(contest[,1], side="both")
+  contest <- contest[,-1, drop=FALSE]
+  contest[] <- lapply(contest, as.numeric)
+  contest <- cbind(Precinct = rownames(contest), contest)
+  rownames(contest) <- NULL
+  
+  write_csv(contest, paste0("contests/",i,".csv"))
+}
+```
+

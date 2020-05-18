@@ -38,3 +38,5 @@ rsconnect/
 *.zip
 temp.txt
 Contra Costa - Election Night Reporting - 2018-12-12.png
+.DS_Store
+*.Rproj

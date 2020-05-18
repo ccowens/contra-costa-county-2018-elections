@@ -1,0 +1,83 @@
+---
+title: "Fleshing Out the Contest Index File's Info"
+author: "Charles Cowens"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r knitr-setup, include=FALSE}
+knitr::opts_chunk$set(results='hide', warning=F, message=F)
+```
+
+This script analyzes the names of the contests to add more info to the overall index-of-contests CSV.  
+
+## Packages  
+
+The script uses two extra packages:
+
+* **stringr** adds these functions: `str_split()`, `str_trim()`, `str_sub()`  
+* **readr** adds `read_csv`, `write_csv()`  
+* **dplyr** adds `arrange()`
+
+```{r packages}
+if(!require(stringr)) {install.packages("stringr"); library(stringr)} 
+if(!require(readr)) {install.packages("readr"); library(readr)} 
+if(!require(dplyr)) {install.packages("dplyr"); library(dplyr)} 
+```
+
+## Setting Up
+
+```{r}
+ioc <- read_csv("contests/index-of-contests.csv")
+```
+
+## Add Column for Jurisidiction
+
+```{r}
+ioc$Jurisdiction <- ifelse(str_detect(ioc$Contest,"SCHOOL|COLLEGE|EDUCATION"),"School",
+      ifelse(str_detect(ioc$Contest,"UNITED STATES"),"National",
+             ifelse(str_detect(ioc$Contest,"COURT"),"Judicial",
+                    ifelse(str_detect(ioc$Contest,"DISTRICT|CITY|TOWN|COMMUNITY|COUNTY"), "Other Local", "State"
+))))
+
+ioc[str_detect(ioc$Contest,"MEMBER OF THE STATE"),]$Jurisdiction <- "State" 
+```
+
+## Add Column for Type of Contest
+
+```{r}
+
+ioc$Type <- ifelse((ioc$Jurisdiction == "State") | (ioc$Jurisdiction == "National"), "OneFromTopTwo", 
+       ifelse(ioc$Jurisdiction == "Judicial", "YesOrNo",
+              "TopX"))
+
+ioc[grepl("^[A-Z][A-Z]* -|^PROPOSITION ", ioc$Contest), ]$Type <- "Measure"
+
+```
+
+## Write Out Results
+
+```{r}
+write_csv(ioc, "contests/index-of-contests.csv")
+```
+
+## Make Table for Measures
+
+```{r}
+
+measures <- filter(ioc, Type == "Measure")
+
+  
+  ioc$Type <- ifelse((ioc$Jurisdiction == "State") | (ioc$Jurisdiction == "National"), "OneFromTopTwo", 
+       ifelse(ioc$Jurisdiction == "Judicial", "YesOrNo",
+              "TopX"))
+
+ioc[grepl("^[A-Z][A-Z]* -|^PROPOSITION ", ioc$Contest), ]$Type <- "Measure"
+
+```
+
